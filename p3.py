@@ -111,6 +111,7 @@ class Ball(object):
         self._pos.x = pos.x % SCREEN_WIDTH
         self._pos.y = pos.y % SCREEN_HEIGHT
 
+        
     def draw(self):
         pygame.draw.circle(screen, self.colour, (int(self.pos.x), int(self.pos.y)), self.radius)
 
@@ -151,6 +152,9 @@ def ballball_collision(b1, b2):
     b2.vel.x = v_v2nPrime.x + v_v2tPrime.x
     b2.vel.y = v_v2nPrime.y + v_v2tPrime.y
 
+    #b1.vel = v_v1nPrime + v_v1tPrime
+    #b2.vel = v_v2nPrime + v_v2tPrime
+
 
 def check_intersection(b1, b2):
     delta = b1.pos - b2.pos
@@ -163,7 +167,7 @@ def check_intersection(b1, b2):
         return False
 
 
-def query_collision_pairs(balls):
+def query_collision_pairs(balls, isStatic):
     # Somewhat inefficient
     i = 0
     j = 0
@@ -174,7 +178,13 @@ def query_collision_pairs(balls):
         while (j < len(balls)):
             b2 = balls[j]
             if (check_intersection(b1, b2)):
-                ballball_collision(b1, b2)
+                if isStatic:
+                    # Can exceed recusrion depth here if there are too many balls
+                    balls[i] = Ball()
+                    query_collision_pairs(balls, 1)
+                    return
+                elif not isStatic:
+                    ballball_collision(b1, b2)
             else:
                 pass
             j += 1
@@ -190,10 +200,9 @@ def query_collision_pairs(balls):
 
 
 
-#all_balls = [Ball() for x in range(100)]
-#all_balls = [Ball(), Ball()]
-
+# Some other initialisation
 all_balls = [Ball() for _ in range(int(sys.argv[1]))]
+query_collision_pairs(all_balls, True)
 
 while not done:
 
@@ -210,7 +219,7 @@ while not done:
         each.draw()
         each.update()
 
-    query_collision_pairs(all_balls)
+    query_collision_pairs(all_balls, False)
 
 
     FPS = myfont.render("{:2.2f}".format(clock.get_fps()), False, (0, 0, 255))
