@@ -22,30 +22,9 @@ myfont = pygame.font.SysFont('Arial', 30)
 
 class Vector2d(object):
     def __init__(self, x=0, y=0):
-        self.__x = x
-        self.__y = y
+        self.x = x
+        self.y = y
 
-    @property
-    def x(self):
-        return self.__x
-
-    @property
-    def y(self):
-        return self.__y
-
-    @x.setter
-    def x(self, x):
-        if x < 0 or x > SCREEN_WIDTH:
-            self.__x = x % SCREEN_WIDTH
-        else:
-            self.__x = x
-
-    @y.setter
-    def y(self, y):
-        if y < 0 or y > SCREEN_HEIGHT:
-            self.__y = y % SCREEN_HEIGHT 
-        else:
-            self.__y = y
 
     def __add__(self, other):
         if type(other) == Vector2d:
@@ -98,42 +77,63 @@ class Vector2d(object):
 class Ball(object):
     def __init__(self):
         self.colour = (ri(0, 255), ri(0, 255), ri(0, 255))
-        self.pos    = Vector2d(ri(0, SCREEN_WIDTH), ri(0, SCREEN_HEIGHT))
-        self.vel    = Vector2d(ri(-10, 10),ri(-10, 10))
-        self.radius = ri(0, 100)
-        self.mass   = ri(1, 50)
+        self.radius = ri(10, 100)
+        self.mass   = ri(1, 10)
+        self._pos   = Vector2d(ri(0 + self.radius, SCREEN_WIDTH - self.radius), ri(0 + self.radius, SCREEN_HEIGHT - self.radius))
+        self._vel   = Vector2d(ri(-10, 10),ri(-10, 10))
+
+
+    @property
+    def vel(self):
+        return self._vel
+
+    @vel.setter
+    def vel(self, vel):
+        if vel.x > 10:
+            vel.x = 10
+        elif vel.x < -10:
+            vel.x = -10
+
+        if vel.y > 10:
+            vel.y = 10
+        elif vel.y < -10:
+            vel.y = -10
+
+        self._vel = vel
+
+    @property
+    def pos(self):
+        return self._pos
+
+    # Setter is a bit pointless since balls can't leave the bounds of the screen
+    @pos.setter
+    def pos(self, pos):
+        self._pos.x = pos.x % SCREEN_WIDTH
+        self._pos.y = pos.y % SCREEN_HEIGHT
 
     def draw(self):
         pygame.draw.circle(screen, self.colour, (int(self.pos.x), int(self.pos.y)), self.radius)
 
     def update(self):
-        self.pos.x += self.vel.x
-        self.pos.y += self.vel.y
+        #self.pos.x += self.vel.x
+        #self.pos.y += self.vel.y
+        self.pos = self.pos + self.vel
 
 
 
-def do_collision(b1, b2):
-    #col_vecx = (((b1.vec2d.x * b2.radius) + (b2.vec2d.x * b1.radius)) / (b1.radius + b2.radius))
-    #col_vecy = (((b1.vec2d.y * b2.radius) + (b2.vec2d.y * b1.radius)) / (b1.radius + b2.radius))
-
-    #vel1x = (b1.vel.x * (b1.mass - b2.mass)) + (2 * b2.mass * b2.vel.x) / (b1.mass + b2.mass)
-    #vel1y = (b1.vel.y * (b1.mass - b2.mass)) + (2 * b2.mass * b2.vel.y) / (b1.mass + b2.mass)
-    #vel2x = (b2.vel.x * (b2.mass - b1.mass)) + (2 * b1.mass * b1.vel.x) / (b2.mass + b1.mass)
-    #vel2y = (b2.vel.y * (b2.mass - b1.mass)) + (2 * b1.mass * b1.vel.y) / (b2.mass + b1.mass)
-
-    # return if objects are moving away from each other
-    #if (b2.vel - b1.vel).dot_product(b2.pos - b1.pos) <= 0:
-
-    # Getting the normal
+def ballball_collision(b1, b2):
+    # Getting the normal, unit normal and unit tangent
     v_n = b2.pos - b1.pos
     v_un = v_n.normal()
     v_ut = v_un.perpendicular()
 
+    # dot products
     v1n = v_un.dot_product(b1.vel)
     v1t = v_ut.dot_product(b1.vel)
     v2n = v_un.dot_product(b2.vel)
     v2t = v_ut.dot_product(b2.vel)
 
+    # New velocity normals and tangents
     v1tPrime = v1t
     v2tPrime = v2t
 
@@ -145,6 +145,7 @@ def do_collision(b1, b2):
     v_v2nPrime = v2nPrime * v_un
     v_v2tPrime = v2tPrime * v_ut
 
+    # Updating velocity
     b1.vel.x = v_v1nPrime.x + v_v1tPrime.x
     b1.vel.y = v_v1nPrime.y + v_v1tPrime.y
     b2.vel.x = v_v2nPrime.x + v_v2tPrime.x
@@ -163,20 +164,29 @@ def check_intersection(b1, b2):
 
 
 def query_collision_pairs(balls):
+    # Somewhat inefficient
     i = 0
     j = 0
+    # checking ball to ball collisions
     while (i < len(balls) - 1):
         b1 = balls[i]
         j = i + 1
         while (j < len(balls)):
             b2 = balls[j]
             if (check_intersection(b1, b2)):
-                do_collision(b1, b2)
+                ballball_collision(b1, b2)
             else:
                 pass
             j += 1
 
         i += 1
+
+    # checking ball to wall collisions
+    for a in balls:
+        if a.pos.x - a.radius < 0:             a.vel.x = abs(a.vel.x)
+        if a.pos.x + a.radius > SCREEN_WIDTH:  a.vel.x = -abs(a.vel.x)
+        if a.pos.y - a.radius < 0:             a.vel.y = abs(a.vel.y)
+        if a.pos.y + a.radius > SCREEN_HEIGHT: a.vel.y = -abs(a.vel.y)
 
 
 
