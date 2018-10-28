@@ -175,6 +175,8 @@ def ballball_collision(b1, b2):
     #b1.draw()
     #b2.draw()
 
+    # Stopping balls from getting stuck into each other
+
 
 def check_intersection(b1, b2):
     delta = (b1.pos + b1.vel) - (b2.pos + b2.vel)
