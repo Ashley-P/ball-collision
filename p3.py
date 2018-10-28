@@ -1,4 +1,5 @@
 import sys
+import copy
 import pygame
 import math
 from random import randint as ri
@@ -16,6 +17,7 @@ OFFSET = 25
 ### INITIALISATION ###
 screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
 done = False
+paused = False
 clock = pygame.time.Clock()
 myfont = pygame.font.SysFont('Arial', 30)
 
@@ -78,7 +80,8 @@ class Ball(object):
     def __init__(self):
         self.colour = (ri(0, 255), ri(0, 255), ri(0, 255))
         self.radius = ri(10, 100)
-        self.mass   = ri(1, 10)
+        self.mass   = int(self.radius / 10)
+        #self.mass   = ri(1, 10)
         self._pos   = Vector2d(ri(0 + self.radius, SCREEN_WIDTH - self.radius), ri(0 + self.radius, SCREEN_HEIGHT - self.radius))
         self._vel   = Vector2d(ri(-10, 10),ri(-10, 10))
 
@@ -123,6 +126,10 @@ class Ball(object):
 
 
 def ballball_collision(b1, b2):
+    # Storing the old vectors
+    b1old = copy.copy(b1.vel)
+    b2old = copy.copy(b2.vel)
+
     # Getting the normal, unit normal and unit tangent
     v_n = b2.pos - b1.pos
     v_un = v_n.normal()
@@ -146,18 +153,31 @@ def ballball_collision(b1, b2):
     v_v2nPrime = v2nPrime * v_un
     v_v2tPrime = v2tPrime * v_ut
 
-    # Updating velocity
-    b1.vel.x = v_v1nPrime.x + v_v1tPrime.x
-    b1.vel.y = v_v1nPrime.y + v_v1tPrime.y
-    b2.vel.x = v_v2nPrime.x + v_v2tPrime.x
-    b2.vel.y = v_v2nPrime.y + v_v2tPrime.y
+    ## Updating velocity
+    #b1.vel.x = v_v1nPrime.x + v_v1tPrime.x
+    #b1.vel.y = v_v1nPrime.y + v_v1tPrime.y
+    #b2.vel.x = v_v2nPrime.x + v_v2tPrime.x
+    #b2.vel.y = v_v2nPrime.y + v_v2tPrime.y
 
-    #b1.vel = v_v1nPrime + v_v1tPrime
-    #b2.vel = v_v2nPrime + v_v2tPrime
+    b1.vel = v_v1nPrime + v_v1tPrime
+    b2.vel = v_v2nPrime + v_v2tPrime
+
+    # Stopping balls from getting stuck into each other
+    # Super inefficient
+    tmp = min([b1old.x, b1old.y, b2old.x, b2old.y])
+    b1old = b1old / tmp
+    b2old = b2old / tmp
+
+    #while (check_intersection(b1, b2)):
+    #    b1.vel = b1.vel + b1old
+    #    b2.vel = b2.vel + b2old
+    #
+    #b1.draw()
+    #b2.draw()
 
 
 def check_intersection(b1, b2):
-    delta = b1.pos - b2.pos
+    delta = (b1.pos + b1.vel) - (b2.pos + b2.vel)
 
     distance = math.sqrt(delta.x * delta.x + delta.y * delta.y)
 
@@ -193,16 +213,33 @@ def query_collision_pairs(balls, isStatic):
 
     # checking ball to wall collisions
     for a in balls:
-        if a.pos.x - a.radius < 0:             a.vel.x = abs(a.vel.x)
-        if a.pos.x + a.radius > SCREEN_WIDTH:  a.vel.x = -abs(a.vel.x)
-        if a.pos.y - a.radius < 0:             a.vel.y = abs(a.vel.y)
-        if a.pos.y + a.radius > SCREEN_HEIGHT: a.vel.y = -abs(a.vel.y)
+        if (a.pos.x + a.vel.x) - a.radius < 0:             a.vel.x = abs(a.vel.x)
+        if (a.pos.x + a.vel.x) + a.radius > SCREEN_WIDTH:  a.vel.x = -abs(a.vel.x)
+        if (a.pos.y + a.vel.y) - a.radius < 0:             a.vel.y = abs(a.vel.y)
+        if (a.pos.y + a.vel.y) + a.radius > SCREEN_HEIGHT: a.vel.y = -abs(a.vel.y)
+
+
+def event_handling(ev):
+    global paused
+
+    # Key Events
+    if ev.type == pygame.KEYDOWN:
+        if ev.key == pygame.K_SPACE:
+            paused = not paused
+        elif ev.key == pygame.K_a:
+            advance()
+
+def advance():
+    for each in all_balls:
+        each.draw()
+        each.update()
+    query_collision_pairs(all_balls, isStatic=False)
 
 
 
 # Some other initialisation
 all_balls = [Ball() for _ in range(int(sys.argv[1]))]
-query_collision_pairs(all_balls, True)
+query_collision_pairs(all_balls, isStatic=True)
 
 while not done:
 
@@ -211,18 +248,25 @@ while not done:
     for event in pygame.event.get():
         if event.type == pygame.QUIT: # Checking if the player has pressed the X on the window
             done = True
+        else:
+            event_handling(event)
 
     screen.fill((0, 0, 0)) # Black background
 
 
-    for each in all_balls:
-        each.draw()
-        each.update()
+    # Updating the logic
+    if not paused:
+        advance()
+    else:
+        for each in all_balls:
+            each.draw()
 
-    query_collision_pairs(all_balls, False)
 
-
+    # Screen rendering stuff
     FPS = myfont.render("{:2.2f}".format(clock.get_fps()), False, (0, 0, 255))
     screen.blit(FPS, (0, 0))
 
     pygame.display.flip()
+
+# Cleanup
+pygame.quit()
