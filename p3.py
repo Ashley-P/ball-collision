@@ -53,7 +53,10 @@ class Vector2d(object):
         if type(other) == Vector2d:
             return Vector2d(self.x / other.x, self.y / other.y)
         else:
-            return Vector2d(self.x / other, self.y / other)
+            if other == 0:
+                return Vector2d()
+            else:
+                return Vector2d(self.x / other, self.y / other)
 
     def dot_product(self, other):
         return ((self.x * other.x) + (self.y * other.y))
@@ -66,10 +69,7 @@ class Vector2d(object):
 
     def normal(self):
         magnitude = self.magnitude()
-        if magnitude != 0:
-            return Vector2d(self.x / magnitude, self.y / magnitude)
-        else:
-            return Vector2d()
+        return self / magnitude
 
     def perpendicular(self):
         return Vector2d(-self.y, self.x)
@@ -78,12 +78,12 @@ class Vector2d(object):
 
 class Ball(object):
     def __init__(self):
-        self.colour = (ri(0, 255), ri(0, 255), ri(0, 255))
+        self.colour = [ri(0, 255), ri(0, 255), ri(0, 255)]
         self.radius = ri(10, 100)
         self.mass   = int(self.radius / 10)
-        #self.mass   = ri(1, 10)
         self._pos   = Vector2d(ri(0 + self.radius, SCREEN_WIDTH - self.radius), ri(0 + self.radius, SCREEN_HEIGHT - self.radius))
         self._vel   = Vector2d(ri(-10, 10),ri(-10, 10))
+        self.frctn  = 1
 
 
     @property
@@ -119,10 +119,20 @@ class Ball(object):
         pygame.draw.circle(screen, self.colour, (int(self.pos.x), int(self.pos.y)), self.radius)
 
     def update(self):
-        #self.pos.x += self.vel.x
-        #self.pos.y += self.vel.y
         self.pos = self.pos + self.vel
+        self.vel = self.vel * self.frctn
+        self.frctn -= 0.005
+        if self.vel.x < 1 and self.vel.y < 1:
+            self.vel = Vector2d()
+            self.frctn = 1
 
+
+class VelocityLine:
+    def __init__(self, pos1: Vector2d, pos2: Vector2d):
+        self.pos1        = pos1
+        self.pos2        = pos2
+        self.active_ball = None
+        self.active      = False
 
 
 def ballball_collision(b1, b2):
@@ -223,6 +233,7 @@ def query_collision_pairs(balls, isStatic):
 
 def event_handling(ev):
     global paused
+    global vel_line
 
     # Key Events
     if ev.type == pygame.KEYDOWN:
@@ -230,6 +241,25 @@ def event_handling(ev):
             paused = not paused
         elif ev.key == pygame.K_a:
             advance()
+
+    elif ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.button == 1: # Left Mouse Button
+            for a in all_balls:
+                if ((a.pos.x - a.radius) < ev.pos[0] < (a.pos.x + a.radius) and 
+                        (a.pos.y - a.radius) < ev.pos[1] < (a.pos.y + a.radius)):
+                    vel_line.pos1 = a.pos
+                    vel_line.active_ball = a
+                    vel_line.active = True
+
+    elif ev.type == pygame.MOUSEBUTTONUP:
+        pass
+
+    elif ev.type == pygame.MOUSEMOTION:
+        if vel_line.active:
+            vel_line.pos2.x = ev.pos[0]
+            vel_line.pos2.y = ev.pos[1]
+
+
 
 def advance():
     for each in all_balls:
@@ -242,6 +272,7 @@ def advance():
 # Some other initialisation
 all_balls = [Ball() for _ in range(int(sys.argv[1]))]
 query_collision_pairs(all_balls, isStatic=True)
+vel_line = VelocityLine(Vector2d(0, 0), Vector2d(0, 0))
 
 while not done:
 
@@ -266,6 +297,8 @@ while not done:
 
     # Screen rendering stuff
     FPS = myfont.render("{:2.2f}".format(clock.get_fps()), False, (0, 0, 255))
+    if vel_line.active:
+        pygame.draw.line(screen, [0, 0, 255], [vel_line.pos1.x, vel_line.pos1.y], [vel_line.pos2.x, vel_line.pos2.y])
     screen.blit(FPS, (0, 0))
 
     pygame.display.flip()
