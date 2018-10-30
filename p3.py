@@ -13,6 +13,7 @@ pygame.init()
 SCREEN_WIDTH = 1500
 SCREEN_HEIGHT = 900
 OFFSET = 25
+MAX_SPEED = 25
 
 ### INITIALISATION ###
 screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
@@ -83,7 +84,7 @@ class Ball(object):
         self.mass   = int(self.radius / 10)
         self._pos   = Vector2d(ri(0 + self.radius, SCREEN_WIDTH - self.radius), ri(0 + self.radius, SCREEN_HEIGHT - self.radius))
         self._vel   = Vector2d(ri(-10, 10),ri(-10, 10))
-        self.frctn  = 1
+        self.frctn  = 0.99
 
 
     @property
@@ -92,15 +93,15 @@ class Ball(object):
 
     @vel.setter
     def vel(self, vel):
-        if vel.x > 10:
-            vel.x = 10
-        elif vel.x < -10:
-            vel.x = -10
+        if vel.x > MAX_SPEED:
+            vel.x = MAX_SPEED
+        elif vel.x < -MAX_SPEED:
+            vel.x = -MAX_SPEED
 
-        if vel.y > 10:
-            vel.y = 10
-        elif vel.y < -10:
-            vel.y = -10
+        if vel.y > MAX_SPEED:
+            vel.y = MAX_SPEED
+        elif vel.y < -MAX_SPEED:
+            vel.y = -MAX_SPEED
 
         self._vel = vel
 
@@ -121,10 +122,15 @@ class Ball(object):
     def update(self):
         self.pos = self.pos + self.vel
         self.vel = self.vel * self.frctn
-        self.frctn -= 0.005
-        if self.vel.x < 1 and self.vel.y < 1:
-            self.vel = Vector2d()
-            self.frctn = 1
+        #self.frctn -= 0.005
+
+        if abs(self.vel.x) < 0.1 and abs(self.vel.y < 0.1):
+            self.vel.x = 0
+            self.vel.y = 0
+            #self.frctn = 1
+
+        elif self.vel.x == 0 and self.vel.y == 0:
+            pass
 
 
 class VelocityLine:
@@ -163,27 +169,13 @@ def ballball_collision(b1, b2):
     v_v2nPrime = v2nPrime * v_un
     v_v2tPrime = v2tPrime * v_ut
 
-    ## Updating velocity
-    #b1.vel.x = v_v1nPrime.x + v_v1tPrime.x
-    #b1.vel.y = v_v1nPrime.y + v_v1tPrime.y
-    #b2.vel.x = v_v2nPrime.x + v_v2tPrime.x
-    #b2.vel.y = v_v2nPrime.y + v_v2tPrime.y
-
     b1.vel = v_v1nPrime + v_v1tPrime
     b2.vel = v_v2nPrime + v_v2tPrime
 
     # Stopping balls from getting stuck into each other
-    # Super inefficient
-    tmp = min([b1old.x, b1old.y, b2old.x, b2old.y])
-    b1old = b1old / tmp
-    b2old = b2old / tmp
-
-    #while (check_intersection(b1, b2)):
-    #    b1.vel = b1.vel + b1old
-    #    b2.vel = b2.vel + b2old
-    #
-    #b1.draw()
-    #b2.draw()
+    # Super inefficient - Can also throw an error if one of the vectors is 0
+    b1old = b1old / min([b1old.x, b1old.y, b2old.x, b2old.y]) 
+    b2old = b2old / min([b1old.x, b1old.y, b2old.x, b2old.y]) 
 
     # Stopping balls from getting stuck into each other
 
@@ -247,12 +239,20 @@ def event_handling(ev):
             for a in all_balls:
                 if ((a.pos.x - a.radius) < ev.pos[0] < (a.pos.x + a.radius) and 
                         (a.pos.y - a.radius) < ev.pos[1] < (a.pos.y + a.radius)):
-                    vel_line.pos1 = a.pos
+                    vel_line.pos1        = a.pos
+                    vel_line.pos2.x      = ev.pos[0]
+                    vel_line.pos2.y      = ev.pos[1]
                     vel_line.active_ball = a
-                    vel_line.active = True
+                    vel_line.active      = True
 
     elif ev.type == pygame.MOUSEBUTTONUP:
-        pass
+        # Setting the velocity for the ball
+        if vel_line.active:
+            vel_line.active_ball.vel.x = (vel_line.pos2.x - vel_line.pos1.x) / 20
+            vel_line.active_ball.vel.y = (vel_line.pos2.y - vel_line.pos1.y) / 20
+
+            vel_line.active_ball = None
+            vel_line.active = False 
 
     elif ev.type == pygame.MOUSEMOTION:
         if vel_line.active:
@@ -286,7 +286,6 @@ while not done:
 
     screen.fill((0, 0, 0)) # Black background
 
-
     # Updating the logic
     if not paused:
         advance()
@@ -294,12 +293,13 @@ while not done:
         for each in all_balls:
             each.draw()
 
-
     # Screen rendering stuff
     FPS = myfont.render("{:2.2f}".format(clock.get_fps()), False, (0, 0, 255))
+    Controls = myfont.render("A = Advance, SPACE = Pause", False, (0, 0, 255))
     if vel_line.active:
-        pygame.draw.line(screen, [0, 0, 255], [vel_line.pos1.x, vel_line.pos1.y], [vel_line.pos2.x, vel_line.pos2.y])
+        pygame.draw.line(screen, [0, 0, 255], [vel_line.pos1.x, vel_line.pos1.y], [vel_line.pos2.x, vel_line.pos2.y], 2)
     screen.blit(FPS, (0, 0))
+    screen.blit(Controls, (0, SCREEN_HEIGHT-30))
 
     pygame.display.flip()
 
